@@ -95,12 +95,13 @@ def resources_to_text(resources):
 			result = result + f", Name: {r['Name']}"
 	return result
 		
-ARG_HELP =  'python3 security-hub-to-jira.py --account 325565585839[,383874245509,...] --severity CRITICAL[,HIGH,...] --dryrun'
+ARG_HELP =  'python3 security-hub-to-jira.py --account 325565585839[,383874245509,...] --severity CRITICAL[,HIGH,...] --dryrun  --verbose'
 
 def main():
 	dry_run=False
+	verbose=False
 	try:
-		opts, args = getopt.getopt(sys.argv[1:],"a:s:d",["account=", "severity=", "dryrun"])
+		opts, args = getopt.getopt(sys.argv[1:],"a:s:dv",["account=", "severity=", "dryrun", "verbose"])
 	except getopt.GetoptError:
 		print(ARG_HELP)
 		sys.exit(2)
@@ -114,6 +115,8 @@ def main():
 			severity_labels = arg.split(",")
 		elif opt in ("-d", "--dryrun"):
 			dry_run=True
+		elif opt in ("-v", "--verbose"):
+			verbose=True
       	
   	# get SecHub findings
 	sec_hub_findings = get_sec_hub_findings(aws_accounts, severity_labels)
@@ -141,7 +144,7 @@ def main():
 				print(f"Nothing to update in **{status}** {key} {jira_summary}")
 			else:
 				if dry_run:
-					print(f"UPDATE existing issue {key} {jira_summary}")
+					print(f"UPDATE existing issue {key} {jira_summary} {finding['description']} {resources_to_text(finding['resources']) if verbose else ''}")
 				else:
 					jira.issue_update(key, fields_to_update)
 		# otherwise create a new issue
@@ -154,7 +157,7 @@ def main():
 				"issuetype": { "name": "Bug" }
 			}
 			if dry_run:
-				print(f"CREATE new issue {jira_summary}")
+				print(f"CREATE new issue {jira_summary} {finding['description']} {resources_to_text(finding['resources']) if verbose else ''}")
 			else:
 				jira.issue_create(fields_to_create)
 		
