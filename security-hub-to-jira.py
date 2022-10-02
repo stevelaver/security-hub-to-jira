@@ -96,7 +96,7 @@ def get_sec_hub_findings(aws_account_ids, severity_labels):
 						record = {"account":account, "product":product, "name":name, "vulnerabilities":[], "severity":severity,  "resources":set()}
 						findings[key] = record
 					record["resources"].add(resource_descriptor(resource))	
-					record["vulnerabilities"].append({"title":title, "description":description})	
+					record["vulnerabilities"].append(f"{title}: {description}")	
 			else:
 				raise Error(f"Unexpected: {group_by}")
 
@@ -129,15 +129,17 @@ def get_jira_sec_hub_issues(jira):
 		
 		
 def resources_to_text(resources):
+	list(resources).sort()
 	result = ""
 	for r in resources:
 		result = result + f"\n\t{r}"
 	return result
 		
 def vulnerabilities_to_text(vs):
+	vs.sort()
 	result = ""
 	for v in vs:
-		result = result + f"\n\t{v['title']}: {v['description']}"
+		result = result + f"\n\t{v}"
 	return result
 		
 ARG_HELP =  'python3 security-hub-to-jira.py --account 325565585839[,383874245509,...] --severity CRITICAL[,HIGH,...] --dryrun  --verbose'
@@ -176,6 +178,12 @@ def main():
 	    
 	issues = get_jira_sec_hub_issues(jira)
 	
+	# create a dict of unmatched issues. As we find them in SecurityHub, we will remove them
+	unmatched_issues = {}
+	for summary in issues:
+		issue = issues[summary]
+		unmatched_issues[issue["key"]]=issue
+	
 	# create or update Jira issues
 	for finding in sec_hub_findings:
 		group_by = get_group_by(finding['product'])
@@ -190,6 +198,7 @@ def main():
 		if jira_summary in issues:
 			issue = issues[jira_summary]
 			key = issue['key']
+			del unmatched_issues[key]
 			status = issue['status']
 			current_content = {"description": issue["description"]}
 			fields_to_update = {"description": description}
@@ -213,6 +222,12 @@ def main():
 				print(f"CREATE new issue {jira_summary} {description if verbose else ''}")
 			else:
 				jira.issue_create(fields_to_create)
+		
+	print(f"\n\nThe following Jira issues are no longer found in AWS SecurityHub and can be closed in Jira:")
+	for key in unmatched_issues:
+		issue = unmatched_issues[key]
+		if issue['status'] not in ('Resolved', 'Closed', 'Done'):
+			print(f"{key} {issue['status']} {issue['summary']}")
 		
 if __name__ == '__main__':
 	main()
