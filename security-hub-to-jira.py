@@ -11,7 +11,7 @@ from enum import Enum
 
 security_hub_label='security-hub'
 auto_generated_label='auto-generated'
-jql_request = f"labels = {security_hub_label} and labels={auto_generated_label}"
+JQL_REQUEST = f"labels = {security_hub_label} and labels={auto_generated_label}"
 limit = 20
 LEN=100
 
@@ -112,7 +112,7 @@ def get_jira_sec_hub_issues(jira):
 	start=0
 	result = {}
 	while total is None or start<total:
-		response = jira.jql(jql_request, start=start, limit=limit)
+		response = jira.jql(JQL_REQUEST, start=start, limit=limit)
 		total = response['total']
 		issues = response['issues']
 		for issue in issues:
@@ -126,8 +126,7 @@ def get_jira_sec_hub_issues(jira):
 			result[summary]={"key":key, "summary":summary, "description":description, 'status':status}
 		start=start+limit
 	return result
-		
-		
+
 def resources_to_text(resources_set):
 	resources_list = list(resources_set)
 	resources_list.sort()
@@ -143,14 +142,14 @@ def vulnerabilities_to_text(vs):
 		result = result + f"\n\t{v}"
 	return result
 		
-ARG_HELP =  'python3 security-hub-to-jira.py --account 325565585839[,383874245509,...] --severity CRITICAL[,HIGH,...] --dryrun  --verbose'
+ARG_HELP =  'python3 security-hub-to-jira.py --account 325565585839[,383874245509,...] --severity CRITICAL[,HIGH,...] --jira_project IT --dryrun  --verbose'
 WARNING_HDR = "Machine generated description.  Do not alter.\n\n"
 
 def main():
 	dry_run=False
 	verbose=False
 	try:
-		opts, args = getopt.getopt(sys.argv[1:],"a:s:dv",["account=", "severity=", "dryrun", "verbose"])
+		opts, args = getopt.getopt(sys.argv[1:],"a:s:p:dv",["account=", "severity=", "jira_project=", "dryrun", "verbose"])
 	except getopt.GetoptError:
 		print(ARG_HELP)
 		sys.exit(2)
@@ -166,6 +165,8 @@ def main():
 			dry_run=True
 		elif opt in ("-v", "--verbose"):
 			verbose=True
+		elif opt in("-p", "--jira_project"):
+			jira_project = arg
       	
   	# get SecHub findings
 	sec_hub_findings = get_sec_hub_findings(aws_accounts, severity_labels)
@@ -216,7 +217,7 @@ def main():
 				"summary": jira_summary,
 				"description": description,
 				"labels":[security_hub_label, auto_generated_label],
-				"project": {"key": "IT"},
+				"project": {"key": jira_project},
 				"issuetype": { "name": "Bug" }
 			}
 			if dry_run:
