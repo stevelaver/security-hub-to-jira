@@ -98,7 +98,7 @@ def get_sec_hub_findings(aws_account_ids, severity_labels):
 					record["resources"].add(resource_descriptor(resource))	
 					record["vulnerabilities"].append(f"{title}: {description}")	
 			else:
-				raise Error(f"Unexpected: {group_by}")
+				raise Exception(f"Unexpected: {group_by}")
 
 		if 'NextToken' in response:
 			next_token = response['NextToken']
@@ -122,16 +122,17 @@ def get_jira_sec_hub_issues(jira):
 			summary = issue['fields']['summary']
 			description = issue['fields']['description']
 			if summary in result:
-				raise Error(f"Repeated issue title: {summary}")
+				raise Exception(f"Repeated issue title: {summary}")
 			result[summary]={"key":key, "summary":summary, "description":description, 'status':status}
 		start=start+limit
-		return result
+	return result
 		
 		
-def resources_to_text(resources):
-	list(resources).sort()
+def resources_to_text(resources_set):
+	resources_list = list(resources_set)
+	resources_list.sort()
 	result = ""
-	for r in resources:
+	for r in resources_list:
 		result = result + f"\n\t{r}"
 	return result
 		
@@ -194,7 +195,7 @@ def main():
 			jira_summary=f"{finding['account']} {finding['name']}"
 			description = f"{WARNING_HDR}Vulnerabilities:\n{vulnerabilities_to_text(finding['vulnerabilities'])}\n\nResources:\n{resources_to_text(finding['resources'])}"
 		else:
-			raise Error(f"Unexpected: {group_by}")
+			raise Exception(f"Unexpected: {group_by}")
 		if jira_summary in issues:
 			issue = issues[jira_summary]
 			key = issue['key']
@@ -223,7 +224,7 @@ def main():
 			else:
 				jira.issue_create(fields_to_create)
 		
-	print(f"\n\nThe following Jira issues are no longer found in AWS SecurityHub and can be closed in Jira:")
+	print(f"\n\nThe following Jira issues were not found in AWS SecurityHub and can be closed in Jira:")
 	for key in unmatched_issues:
 		issue = unmatched_issues[key]
 		if issue['status'] not in ('Resolved', 'Closed', 'Done'):
