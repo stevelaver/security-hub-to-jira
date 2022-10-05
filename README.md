@@ -26,7 +26,7 @@ to use an STS token.  Jira credentials are set as environment variables,
 `JIRA_USER_EMAIL_ADDRESS` and`JIRA_API_TOKEN`.  For details on getting Jira credentials,
 see [your security settings](https://id.atlassian.com/manage-profile/security/api-tokens).
 
-###Arguments
+####Arguments
 
 --account, -a: comma separated list of numerical AWS account IDs
 
@@ -46,3 +46,21 @@ python3 security-hub-to-jira.py --account 325565585839,383874245509 --severity C
 
 ```
 
+# suppress-findings-for-stopped-instances 
+
+This script suppresses findings for EC2 instances that are stopped.  The reasoning is that the remediation
+for Inspector findings is patching and patching can't run on stopped instances.  So we suppress such findings
+which will either be taken care of by automatic patching when the instance starts or will be recreated once 
+the instance starts, if patching is not performed as expected.
+
+####Arguments
+
+--account, -a: comma separated list of numerical AWS account IDs
+
+--severity, -s: command separated lis of SecuirtyHub severity labels
+
+--dryrun, -d:  do not create or update any Jira issues
+
+```
+python3 suppress-findings-for-stopped-instances.py --account 325565585839,383874245509 --severity CRITICAL,HIGH --dryrun
+```

@@ -43,13 +43,14 @@ def create_filter(aws_account_ids, severity_labels):
 
 def resource_descriptor(r):
 	result =  f"Type: {r['Type']}, Id: {r['Id']}"
-	if "Name" in r and r["Name"] is not None:
-		result = result + f", Name: {r['Name']}"
+	name = resource_name(r)
+	if name is not None:
+		result = result + f", Name: {name}"
 	return result
 	
 def resource_name(r):
 	return r.get("Tags",{"Name":None}).get("Name", None)
-		
+	
 # retrieve SecurityHub findings, grouping together findings having the same
 # AwsAccountId and Title and grouping the associated "resources" into a single list
 def get_sec_hub_findings(aws_account_ids, severity_labels):
@@ -84,7 +85,7 @@ def get_sec_hub_findings(aws_account_ids, severity_labels):
 					findings[key] = record
 				resources = []
 				for resource in f['Resources']:
-					resources.append(resource_descriptor({"Type":resource["Type"], "Id":resource["Id"], "Name":resource_name(resource)}))
+					resources.append(resource_descriptor(resource))
 				record["resources"].extend(resources)	
 			elif group_by==Finding_Group_By.RESOURCE:
 				for resource in f['Resources']:
