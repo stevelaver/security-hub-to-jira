@@ -36,8 +36,12 @@ def is_finding_old(finding, days):
 def is_resource_ec2(resource):
 	return resource['Type']=='AwsEc2Instance'
 	
+instance_running_cache = {}
+	
 def is_ec2_running(aws_account, resource):
 	arn = resource['Id']
+	if arn in instance_running_cache:
+		return instance_running_cache[arn]
 	id = arn.split(":")[-1].split("/")[-1]
 	if not is_resource_ec2(resource):
 		raise Exception(f"{id} is not an EC2 instance")
@@ -48,7 +52,9 @@ def is_ec2_running(aws_account, resource):
 	response = ec2_client.describe_instance_status(InstanceIds=[id], IncludeAllInstances=True)
 	if response['InstanceStatuses'][0]['InstanceId']!=id:
 		raise Exception("Unexpected instance")
-	return response['InstanceStatuses'][0]['InstanceState']['Name']=='running'
+	is_running = response['InstanceStatuses'][0]['InstanceState']['Name']=='running'
+	instance_running_cache[arn]=is_running
+	return is_running
 		
 # retrieve SecurityHub findings, grouping together findings having the same
 # AwsAccountId and Title and grouping the associated "resources" into a single list
@@ -68,11 +74,12 @@ def suppress_findings(aws_account_ids, severity_labels, dry_run):
 			response = client.get_findings(Filters=filters, NextToken=next_token)
 		for f in response['Findings']:
 			account = f['AwsAccountId']
+			print(f"Account: {account} Finding: {f['Id']}")
 				
 			## if the resource is a stopped EC2 and the finding is > 2 weeks old, then suppress it
 			for resource in f['Resources']:
 				if is_resource_ec2(resource) and not is_ec2_running(account, resource) and is_finding_old(f, 14):
-					print(f"Suppress f['Id'] for {resource_name(resource)}")
+					print(f"\tSuppress {f['Id']} for {resource_name(resource)}")
 					finding_ids_to_suppress.append({'Id': f['Id'], 'ProductArn': f['ProductArn']})
 
 		if 'NextToken' in response:

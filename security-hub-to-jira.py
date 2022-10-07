@@ -229,8 +229,12 @@ def main():
 	print(f"\n\nThe following Jira issues were not found in AWS SecurityHub and can be closed in Jira:")
 	for key in unmatched_issues:
 		issue = unmatched_issues[key]
-		if issue['status'] not in ('Resolved', 'Closed', 'Done'):
-			print(f"{key} {issue['status']} {issue['summary']}")
+		aws_account = issue['summary'].split(" ")[0]
+		if aws_account in aws_accounts:
+			# Note: We only do this check for issues corresponding to the accounts we're analyzing
+			# (There may be issues for other accounts, and we can't tell if they are still active.)
+			if issue['status'] not in ('Resolved', 'Closed', 'Done'):
+				print(f"{key} {issue['status']} {issue['summary']}")
 		
 if __name__ == '__main__':
 	main()
