@@ -49,7 +49,10 @@ def is_ec2_running(aws_account, resource):
 	session = boto3.Session(profile_name=aws_account, region_name='us-east-1')
 	ec2_client = session.client('ec2')
 	# get state of EC2
-	response = ec2_client.describe_instance_status(InstanceIds=[id], IncludeAllInstances=True)
+	try:
+		response = ec2_client.describe_instance_status(InstanceIds=[id], IncludeAllInstances=True)
+	except:
+		raise Exception(f"AWS request failed for account {aws_account}.  May need to update credentials.")
 	if response['InstanceStatuses'][0]['InstanceId']!=id:
 		raise Exception("Unexpected instance")
 	is_running = response['InstanceStatuses'][0]['InstanceState']['Name']=='running'
@@ -74,11 +77,11 @@ def suppress_findings(aws_account_ids, severity_labels, dry_run):
 			response = client.get_findings(Filters=filters, NextToken=next_token)
 		for f in response['Findings']:
 			account = f['AwsAccountId']
-			print(f"Account: {account} Finding: {f['Id']}")
+			#print(f"Account: {account} Finding: {f['Id']}")
 				
 			## if the resource is a stopped EC2 and the finding is > 2 weeks old, then suppress it
 			for resource in f['Resources']:
-				if is_resource_ec2(resource) and not is_ec2_running(account, resource) and is_finding_old(f, 14):
+				if is_resource_ec2(resource) and not is_ec2_running(account, resource) and is_finding_old(f, 7):
 					print(f"\tSuppress {f['Id']} for {resource_name(resource)}")
 					finding_ids_to_suppress.append({'Id': f['Id'], 'ProductArn': f['ProductArn']})
 

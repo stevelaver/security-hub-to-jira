@@ -36,6 +36,7 @@ def create_filter(aws_account_ids, severity_labels):
             {'Value': 'NEW', 'Comparison': 'EQUALS'},
             {'Value': 'NOTIFIED', 'Comparison': 'EQUALS'}
         ],
+        #'ProductName': [{'Value': 'Security Hub', 'Comparison': 'EQUALS'}], TODO add a CLI option to filter by product
         'RecordState': [
             {'Value': 'ACTIVE', 'Comparison': 'EQUALS'}
         ]
