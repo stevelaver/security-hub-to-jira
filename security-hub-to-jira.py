@@ -18,6 +18,9 @@ LEN=100
 class Finding_Group_By(Enum):
 	VULNERABILITY=1,
 	RESOURCE=2
+	
+#GENERATORS = ['aws-foundational-security-best-practices', 'cis-aws-foundations-benchmark']
+GENERATORS = ['cis-aws-foundations-benchmark']
 
 Product_To_Group_by={"Inspector": Finding_Group_By.RESOURCE}
 
@@ -36,7 +39,7 @@ def create_filter(aws_account_ids, severity_labels):
             {'Value': 'NEW', 'Comparison': 'EQUALS'},
             {'Value': 'NOTIFIED', 'Comparison': 'EQUALS'}
         ],
-        #'ProductName': [{'Value': 'Security Hub', 'Comparison': 'EQUALS'}], TODO add a CLI option to filter by product
+        #'ProductName': [{'Value': 'Security Hub', 'Comparison': 'EQUALS'}], #TODO add a CLI option to filter by product
         'RecordState': [
             {'Value': 'ACTIVE', 'Comparison': 'EQUALS'}
         ]
@@ -69,6 +72,8 @@ def get_sec_hub_findings(aws_account_ids, severity_labels):
 		else:
 			response = client.get_findings(Filters=filters, NextToken=next_token)
 		for f in response['Findings']:
+			if not any([x in f['GeneratorId'] for x in GENERATORS]):
+				continue
 			finding_count = finding_count + 1
 			account = f['AwsAccountId']
 			severity = f['Severity']['Label']
