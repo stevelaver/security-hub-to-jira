@@ -19,10 +19,13 @@ class Finding_Group_By(Enum):
 	VULNERABILITY=1,
 	RESOURCE=2
 	
-#GENERATORS = ['aws-foundational-security-best-practices', 'cis-aws-foundations-benchmark']
+
 GENERATORS = ['cis-aws-foundations-benchmark']
 
 Product_To_Group_by={"Inspector": Finding_Group_By.RESOURCE}
+
+# Mapping Security Hub Severity to Jira Priority
+SEVERITY_TO_PRIORITY = {"LOW":"Trivial", "MEDIUM":"Minor", "HIGH":"Major", "CRITICAL":"Critical"}
 
 # Group by Vulnerability unless otherwise specified
 def get_group_by(product):
@@ -130,7 +133,7 @@ def get_jira_sec_hub_issues(jira):
 			description = issue['fields']['description']
 			if summary in result:
 				raise Exception(f"Repeated issue title: {summary}")
-			result[summary]={"key":key, "summary":summary, "description":description, 'status':status}
+			result[summary]={"key":key, "summary":summary, "description":description, "status":status, "priority":{"name":priority}}
 		start=start+limit
 	return result
 
@@ -204,18 +207,19 @@ def main():
 			description = f"{WARNING_HDR}Vulnerabilities:\n{vulnerabilities_to_text(finding['vulnerabilities'])}\n\nResources:\n{resources_to_text(finding['resources'])}"
 		else:
 			raise Exception(f"Unexpected: {group_by}")
+		priority = SEVERITY_TO_PRIORITY[finding["severity"]]
 		if jira_summary in issues:
 			issue = issues[jira_summary]
 			key = issue['key']
 			del unmatched_issues[key]
 			status = issue['status']
-			current_content = {"description": issue["description"]}
-			fields_to_update = {"description": description}
+			current_content = {"description": issue["description"], "priority": issue["priority"]}
+			fields_to_update = {"description": description, "priority": {"name":priority}}
 			if current_content == fields_to_update:
 				print(f"Nothing to update in **{status}** {key} {jira_summary}")
 			else:
 				if dry_run:
-					print(f"UPDATE existing issue {key} {jira_summary} {description if verbose else ''}")
+					print(f"UPDATE existing {priority} issue {key} {jira_summary} {description if verbose else ''}")
 				else:
 					jira.issue_update(key, fields_to_update)
 		# otherwise create a new issue
@@ -225,10 +229,11 @@ def main():
 				"description": description,
 				"labels":[security_hub_label, auto_generated_label],
 				"project": {"key": jira_project},
-				"issuetype": { "name": "Bug" }
+				"issuetype": { "name": "Bug" },
+				"priority": {"name":priority}
 			}
 			if dry_run:
-				print(f"CREATE new issue {jira_summary} {description if verbose else ''}")
+				print(f"CREATE new {priority} issue {jira_summary} {description if verbose else ''}")
 			else:
 				jira.issue_create(fields_to_create)
 		
