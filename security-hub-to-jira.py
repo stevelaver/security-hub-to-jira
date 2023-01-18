@@ -83,6 +83,8 @@ def get_sec_hub_findings(aws_account_ids, severity_labels):
 			title = f['Title']
 			description = f['Description']
 			product = f['ProductName']
+			generatorId=f['GeneratorId']
+			descriptionAndGeneratorId=description+"\n\nGeneratorId: "+generatorId
 				
 			group_by = get_group_by(product)
 			if group_by==Finding_Group_By.VULNERABILITY:
@@ -90,7 +92,7 @@ def get_sec_hub_findings(aws_account_ids, severity_labels):
 				if key in findings:
 					record = findings[key]
 				else:
-					record = {"account":account, "product":product, "title":title, "severity":severity, "description":description, "resources":[]}
+					record = {"account":account, "product":product, "title":title, "severity":severity, "description":descriptionAndGeneratorId, "resources":[]}
 					findings[key] = record
 				resources = []
 				for resource in f['Resources']:
@@ -106,7 +108,7 @@ def get_sec_hub_findings(aws_account_ids, severity_labels):
 						record = {"account":account, "product":product, "name":name, "vulnerabilities":[], "severity":severity,  "resources":set()}
 						findings[key] = record
 					record["resources"].add(resource_descriptor(resource))	
-					record["vulnerabilities"].append(f"{title}: {description}")	
+					record["vulnerabilities"].append(f"{title}: {descriptionAndGeneratorId}")	
 			else:
 				raise Exception(f"Unexpected: {group_by}")
 
@@ -237,7 +239,7 @@ def main():
 			else:
 				jira.issue_create(fields_to_create)
 		
-	print(f"\n\nThe following Jira issues were not found in AWS SecurityHub and can be closed in Jira:")
+	print(f"\n\nThe following Jira issues were not found in AWS SecurityHub and are hereby resolved in Jira:")
 	for key in unmatched_issues:
 		issue = unmatched_issues[key]
 		aws_account = issue['summary'].split(" ")[0]
@@ -246,6 +248,11 @@ def main():
 			# (There may be issues for other accounts, and we can't tell if they are still active.)
 			if issue['status'] not in ('Resolved', 'Closed', 'Done'):
 				print(f"{key} {issue['status']} {issue['summary']}")
+				fields_to_update = {'status':'Resolved', 'resolution':'Done'}
+				if not dry_run:
+					#jira.issue_update(key, fields_to_update)
+					#jira.issue_transition(key, 'Resolved')
+					jira.set_issue_status(key, 'Resolved', {'resolution':{'name':'Done'}})
 		
 if __name__ == '__main__':
 	main()
