@@ -1,0 +1,44 @@
+# Cron job to run the SecurityHub-to-Jira task daily
+
+name: Cron job to run the SecurityHub-to-Jira task
+
+on:  
+  schedule:
+    - cron: '0 */4 * * *'
+    
+env:
+  ACCOUNTS: 325565585839,231505186444,237179673806,140124849929,383874245509,153370007719,659375444835
+  JIRA_PROJECT: IT
+  # Note that we don't currently process 'LOW' issues
+  SEVERITY: MEDIUM,HIGH,CRITICAL
+  AWS_ROLE: arn:aws:iam::140124849929:role/sagebase-github-oidc-sage-ProviderRolesecurityhubt-HKJL7F4V1XWF
+
+
+jobs:
+  cron:
+    name: cron
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      id-token: write
+      contents: read
+      packages: write
+    
+    steps:
+    - name: checkout source code
+      uses: actions/checkout@v2
+    # Authenticate to AWS using GitHub OIDC
+    - name: Assume AWS Role
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: ${{ env.AWS_DEFAULT_REGION }}
+          role-to-assume: ${{ env.AWS_ROLE }}
+          role-session-name: GitHubActions-${{ github.repository_owner }}-${{ github.event.repository.name }}-${{ github.run_id }}
+          role-duration-seconds: 60
+          
+    - name: run the script
+      run: python3 security-hub-to-jira.py  --account  ${{ env.ACCOUNTS }} --jira_project ${{ env.IT }} --severity ${{ env.SEVERITY }}
+      env:
+        JIRA_USER_EMAIL_ADDRESS: ${{ secrets.JIRA_USER_EMAIL_ADDRESS }}
+        JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+        
