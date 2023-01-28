@@ -11,6 +11,7 @@ env:
   JIRA_PROJECT: IT
   # Note that we don't currently process 'LOW' issues
   SEVERITY: MEDIUM,HIGH,CRITICAL
+  AWS_DEFAULT_REGION: 'us-east-1' 
   AWS_ROLE: arn:aws:iam::140124849929:role/sagebase-github-oidc-sage-ProviderRolesecurityhubt-HKJL7F4V1XWF
 
 
