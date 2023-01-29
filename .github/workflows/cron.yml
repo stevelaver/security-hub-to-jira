@@ -39,7 +39,7 @@ jobs:
           
     - name: run the script
       run: |
-        pip3 install boto3, atlassian 
+        pip3 install boto3 atlassian 
         python3 security-hub-to-jira.py  --account  ${{ env.ACCOUNTS }} --jira_project ${{ env.IT }} --severity ${{ env.SEVERITY }}
       env:
         JIRA_USER_EMAIL_ADDRESS: ${{ secrets.JIRA_USER_EMAIL_ADDRESS }}
