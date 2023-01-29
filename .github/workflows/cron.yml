@@ -35,7 +35,7 @@ jobs:
         aws-region: ${{ env.AWS_DEFAULT_REGION }}
         role-to-assume: ${{ env.AWS_ROLE }}
         role-session-name: GitHubActions-${{ github.repository_owner }}-${{ github.event.repository.name }}-${{ github.run_id }}
-        role-duration-seconds: 60
+        role-duration-seconds: 900
           
     - name: run the script
       run: python3 security-hub-to-jira.py  --account  ${{ env.ACCOUNTS }} --jira_project ${{ env.IT }} --severity ${{ env.SEVERITY }}
