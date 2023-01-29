@@ -5,6 +5,7 @@ name: Cron job to run the SecurityHub-to-Jira task
 on:  
   schedule:
     - cron: '0 */4 * * *'
+  workflow_dispatch:
     
 env:
   ACCOUNTS: 325565585839,231505186444,237179673806,140124849929,383874245509,153370007719,659375444835
