@@ -62,7 +62,7 @@ def resource_name(r):
 # AwsAccountId and Title and grouping the associated "resources" into a single list
 def get_sec_hub_findings(aws_account_ids, severity_labels):
 	# https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/securityhub.html
-	session = boto3.Session(profile_name='security-account', region_name='us-east-1')
+	session = boto3.Session(region_name='us-east-1')
 	client = session.client('securityhub')
 	filters = create_filter(aws_account_ids, severity_labels)
 	findings = {}
