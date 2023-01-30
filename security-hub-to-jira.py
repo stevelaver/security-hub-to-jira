@@ -187,7 +187,8 @@ def main():
 	jira = Jira(
 	    url='https://sagebionetworks.jira.com/',
 	    username=os.environ['JIRA_USER_EMAIL_ADDRESS'],
-	    password=os.environ['JIRA_API_TOKEN'])
+	    password=os.environ['JIRA_API_TOKEN'],
+	    cloud=True)
 	    
 	issues = get_jira_sec_hub_issues(jira)
 	
