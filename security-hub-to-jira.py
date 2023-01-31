@@ -14,6 +14,11 @@ auto_generated_label='auto-generated'
 JQL_REQUEST = f"labels = {security_hub_label} and labels={auto_generated_label}"
 limit = 20
 LEN=100
+STATUS_RESOLVED="Resolved"
+STATUS_CLOSED="Closed"
+TERMINAL_STATUSES = (STATUS_RESOLVED, STATUS_CLOSED, 'Done')
+RESOLUTION_WONT_DO="Won't Do"
+RESOLUTION_DONE="Done"
 
 class Finding_Group_By(Enum):
 	VULNERABILITY=1,
@@ -40,7 +45,8 @@ def create_filter(aws_account_ids, severity_labels):
         'SeverityLabel': severities,
         'WorkflowStatus': [
             {'Value': 'NEW', 'Comparison': 'EQUALS'},
-            {'Value': 'NOTIFIED', 'Comparison': 'EQUALS'}
+            {'Value': 'NOTIFIED', 'Comparison': 'EQUALS'},
+            {'Value': 'SUPPRESSED', 'Comparison': 'EQUALS'}
         ],
         #'ProductName': [{'Value': 'Security Hub', 'Comparison': 'EQUALS'}], #TODO add a CLI option to filter by product
         'RecordState': [
@@ -48,11 +54,13 @@ def create_filter(aws_account_ids, severity_labels):
         ]
 	}
 
-def resource_descriptor(r):
+def resource_descriptor(r, is_suppressed):
 	result =  f"Type: {r['Type']}, Id: {r['Id']}"
 	name = resource_name(r)
 	if name is not None:
 		result = result + f", Name: {name}"
+	if is_suppressed:
+		result = "SUPPRESSED: "+result
 	return result
 	
 def resource_name(r):
@@ -83,6 +91,8 @@ def get_sec_hub_findings(aws_account_ids, severity_labels):
 			title = f['Title']
 			description = f['Description']
 			product = f['ProductName']
+			status=f['Workflow']['Status']
+			is_suppressed=(status=="SUPPRESSED")
 			generatorId=f['GeneratorId']
 			descriptionAndGeneratorId=description+"\n\nGeneratorId: "+generatorId
 				
@@ -92,12 +102,13 @@ def get_sec_hub_findings(aws_account_ids, severity_labels):
 				if key in findings:
 					record = findings[key]
 				else:
-					record = {"account":account, "product":product, "title":title, "severity":severity, "description":descriptionAndGeneratorId, "resources":[]}
+					record = {"account":account, "product":product, "title":title, "severity":severity, "status":status, "description":descriptionAndGeneratorId, "resources":[], "all_suppressed":True}
 					findings[key] = record
 				resources = []
 				for resource in f['Resources']:
-					resources.append(resource_descriptor(resource))
+					resources.append(resource_descriptor(resource, is_suppressed))
 				record["resources"].extend(resources)	
+				record["all_suppressed"]=record["all_suppressed"] and is_suppressed
 			elif group_by==Finding_Group_By.RESOURCE:
 				for resource in f['Resources']:
 					name = resource_name(resource) if resource_name(resource) is not None else resource["Id"]
@@ -105,10 +116,11 @@ def get_sec_hub_findings(aws_account_ids, severity_labels):
 					if key in findings:
 						record = findings[key]
 					else:
-						record = {"account":account, "product":product, "name":name, "vulnerabilities":[], "severity":severity,  "resources":set()}
+						record = {"account":account, "product":product, "name":name, "vulnerabilities":[], "severity":severity, "status":status, "resources":set(), "all_suppressed":True}
 						findings[key] = record
-					record["resources"].add(resource_descriptor(resource))	
+					record["resources"].add(resource_descriptor(resource, is_suppressed))	
 					record["vulnerabilities"].append(f"{title}: {descriptionAndGeneratorId}")	
+					record["all_suppressed"]=record["all_suppressed"] and is_suppressed
 			else:
 				raise Exception(f"Unexpected: {group_by}")
 
@@ -131,11 +143,12 @@ def get_jira_sec_hub_issues(jira):
 			key = issue['key']
 			priority = issue['fields']['priority']['name']
 			status = issue['fields']['status']['name']
+			resolution = None if issue['fields']['resolution'] is None else issue['fields']['resolution']['name']
 			summary = issue['fields']['summary']
 			description = issue['fields']['description']
 			if summary in result:
 				raise Exception(f"Repeated issue title: {summary}")
-			result[summary]={"key":key, "summary":summary, "description":description, "status":status, "priority":{"name":priority}}
+			result[summary]={"key":key, "summary":summary, "description":description, "status":status, "priority":{"name":priority}, "resolution":resolution}
 		start=start+limit
 	return result
 
@@ -209,6 +222,7 @@ def main():
 			description = f"{WARNING_HDR}Vulnerabilities:\n{vulnerabilities_to_text(finding['vulnerabilities'])}\n\nResources:\n{resources_to_text(finding['resources'])}"
 		else:
 			raise Exception(f"Unexpected: {group_by}")
+			
 		priority = SEVERITY_TO_PRIORITY[finding["severity"]]
 		if jira_summary in issues:
 			issue = issues[jira_summary]
@@ -221,9 +235,16 @@ def main():
 				print(f"Nothing to update in **{status}** {key} {jira_summary}")
 			else:
 				if dry_run:
-					print(f"UPDATE existing {priority} issue {key} {jira_summary} {description if verbose else ''}")
+					print(f"UPDATE existing {priority} **{status}** issue {key} {jira_summary} {description if verbose else ''}")
 				else:
 					jira.issue_update(key, fields_to_update)
+				# if finding is suppressed then issue should be Resolved as Won't Do
+				if finding["all_suppressed"] and not (status in TERMINAL_STATUSES and issue["resolution"]==RESOLUTION_WONT_DO):
+					print(f"\tAdvancing suppressed issue {key} to resolution {RESOLUTION_WONT_DO}.")
+					if not dry_run:
+						jira.set_issue_status(key, STATUS_CLOSED)
+						jira.set_issue_status(key, STATUS_CLOSED, {'resolution':{'name':RESOLUTION_WONT_DO}})
+			
 		# otherwise create a new issue
 		else:
 			fields_to_create = {
@@ -246,13 +267,10 @@ def main():
 		if aws_account in aws_accounts:
 			# Note: We only do this check for issues corresponding to the accounts we're analyzing
 			# (There may be issues for other accounts, and we can't tell if they are still active.)
-			if issue['status'] not in ('Resolved', 'Closed', 'Done'):
+			if issue['status'] not in TERMINAL_STATUSES:
 				print(f"{key} {issue['status']} {issue['summary']}")
-				fields_to_update = {'status':'Resolved', 'resolution':'Done'}
 				if not dry_run:
-					#jira.issue_update(key, fields_to_update)
-					#jira.issue_transition(key, 'Resolved')
-					jira.set_issue_status(key, 'Resolved', {'resolution':{'name':'Done'}})
+					jira.set_issue_status(key, STATUS_RESOLVED, {'resolution':{'name':RESOLUTION_DONE}})
 		
 if __name__ == '__main__':
 	main()
